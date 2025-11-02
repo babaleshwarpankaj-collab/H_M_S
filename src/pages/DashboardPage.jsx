@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import { supabase } from '../lib/supabase';
 import StatCard from '../components/ui/StatCard';
 import { Users, BedDouble, Wrench, CircleDollarSign } from 'lucide-react';
-import { students, rooms, maintenanceRequests, fees } from '../lib/mockData';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -20,11 +21,55 @@ const itemVariants = {
 };
 
 function DashboardPage() {
-    const totalStudents = students.length;
-    const occupiedRooms = rooms.filter(r => r.status === 'Occupied').length;
-    const occupancyRate = rooms.length > 0 ? ((occupiedRooms / rooms.length) * 100).toFixed(0) : 0;
-    const pendingMaintenance = maintenanceRequests.filter(m => m.status === 'Pending').length;
-    const overdueFees = fees.filter(f => f.status === 'Overdue').length;
+    const [stats, setStats] = useState({
+        totalStudents: 0,
+        occupancyRate: 0,
+        pendingMaintenance: 0,
+        overdueFees: 0,
+    });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            setLoading(true);
+            try {
+                const [
+                    { count: totalStudents },
+                    { data: roomsData, error: roomsError },
+                    { count: pendingMaintenance },
+                    { count: overdueFees }
+                ] = await Promise.all([
+                    supabase.from('students').select('*', { count: 'exact', head: true }),
+                    supabase.from('rooms').select('status'),
+                    supabase.from('maintenance_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'),
+                    supabase.from('fees').select('*', { count: 'exact', head: true }).eq('status', 'Overdue')
+                ]);
+
+                if (roomsError) throw roomsError;
+
+                const totalRooms = roomsData.length;
+                const occupiedRooms = roomsData.filter(r => r.status === 'Occupied').length;
+                const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+
+                setStats({
+                    totalStudents: totalStudents || 0,
+                    occupancyRate: occupancyRate || 0,
+                    pendingMaintenance: pendingMaintenance || 0,
+                    overdueFees: overdueFees || 0
+                });
+
+            } catch (error) {
+                toast.error("Failed to load dashboard data.");
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+    }, []);
+
+    const renderValue = (value) => (loading ? '...' : value);
 
     return (
         <motion.div
@@ -33,7 +78,7 @@ function DashboardPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
         >
-            <motion.h1 
+            <motion.h1
                 className="text-3xl font-bold text-base-content dark:text-dark-base-content mb-6"
                 variants={itemVariants}
                 initial="hidden"
@@ -41,27 +86,27 @@ function DashboardPage() {
             >
                 Dashboard Overview
             </motion.h1>
-            <motion.div 
+            <motion.div
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
             >
-                <StatCard title="Total Students" value={totalStudents} icon={<Users />} color="bg-blue-500" />
-                <StatCard title="Occupancy Rate" value={`${occupancyRate}%`} icon={<BedDouble />} color="bg-green-500" />
-                <StatCard title="Pending Maintenance" value={pendingMaintenance} icon={<Wrench />} color="bg-yellow-500" />
-                <StatCard title="Overdue Fees" value={overdueFees} icon={<CircleDollarSign />} color="bg-red-500" />
+                <StatCard title="Total Students" value={renderValue(stats.totalStudents)} icon={<Users />} color="bg-blue-500" />
+                <StatCard title="Occupancy Rate" value={renderValue(`${stats.occupancyRate}%`)} icon={<BedDouble />} color="bg-green-500" />
+                <StatCard title="Pending Maintenance" value={renderValue(stats.pendingMaintenance)} icon={<Wrench />} color="bg-yellow-500" />
+                <StatCard title="Overdue Fees" value={renderValue(stats.overdueFees)} icon={<CircleDollarSign />} color="bg-red-500" />
             </motion.div>
 
-            <motion.div 
+            <motion.div
                 className="mt-8 bg-base-100 dark:bg-dark-base-200 p-6 rounded-xl shadow-lg transition-colors"
                 variants={itemVariants}
                 initial="hidden"
                 animate="visible"
-                transition={{delay: 0.5}}
+                transition={{ delay: 0.5 }}
             >
-                 <h2 className="text-xl font-semibold text-base-content dark:text-dark-base-content mb-4">Recent Activity</h2>
-                 <p className="text-base-content-secondary dark:text-dark-base-content-secondary">Recent activity feed will be displayed here.</p>
+                <h2 className="text-xl font-semibold text-base-content dark:text-dark-base-content mb-4">Recent Activity</h2>
+                <p className="text-base-content-secondary dark:text-dark-base-content-secondary">Recent activity feed will be displayed here.</p>
             </motion.div>
         </motion.div>
     );

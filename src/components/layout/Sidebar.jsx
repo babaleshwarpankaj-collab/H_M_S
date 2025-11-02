@@ -49,13 +49,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     const role = user?.user_metadata?.role;
 
     let navLinks = [];
-    // Swapping navigation links as per user request
     if (role === 'Admin') {
         navLinks = adminNavLinks;
     } else if (role === 'Student') {
-        navLinks = staffNavLinks; // Student gets staff links
+        navLinks = studentNavLinks; // Corrected: Student gets student links
     } else if (role === 'Staff') {
-        navLinks = studentNavLinks; // Staff gets student links
+        navLinks = staffNavLinks; // Corrected: Staff gets staff links
     }
 
     return (
